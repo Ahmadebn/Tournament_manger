@@ -65,4 +65,22 @@ body {
 </div>
 
 </body>
+    <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+ apiKey: "AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
+ authDomain: "football-manager-a8c11.firebaseapp.com",
+ projectId: "football-manager-a8c11",
+ storageBucket: "football-manager-a8c11.firebasestorage.app",
+ messagingSenderId: "78452499051",
+ appId: "1:78452499051:web:5f26427727d1d17024c72e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+console.log("Firebase connected");
+    </script>
 </html>
