@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Tournament</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    background:#f4f4f4;
+    padding:20px;
+}
+
+.form-container{
+    background:white;
+    max-width:500px;
+    margin:auto;
+    padding:20px;
+    border-radius:8px;
+}
+
+input{
+    width:90%;
+    padding:10px;
+    margin-bottom:10px;
+}
+
+button{
+    padding:10px 15px;
+    background:#2ecc71;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+
+ul{
+    padding-left:20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="form-container">
+
+<h2>Create Tournament</h2>
+
+<input id="tourneyName" placeholder="Tournament name">
+
+<br>
+
+<input id="teamInput" placeholder="Team name">
+<button onclick="addTeam()">+</button>
+
+<ul id="teamList"></ul>
+
+<button onclick="goBack()">Confirm & Create</button>
+
+</div>
+
+<script>
+function addTeam(){
+    let input=document.getElementById("teamInput");
+    if(input.value!=""){
+        document.getElementById("teamList").innerHTML+=`<li>${input.value}</li>`;
+        input.value="";
+    }
+}
+
+function goBack(){
+    window.location.href="index.html";
+}
+</script>
+
+</body>
+</html>
