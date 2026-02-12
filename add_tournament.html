@@ -96,10 +96,18 @@ window.createTournament = async function(){
    return;
  }
 
- await addDoc(collection(db,"tournaments"),{
+ try {
+ const ref = await addDoc(collection(db,"tournaments"),{
    name:name,
    teams:teams
  });
+
+ console.log("SAVED", ref.id);
+
+} catch(e){
+ console.error("FIREBASE ERROR", e);
+ alert(e.message);
+    }
 
  window.location="index.html";
 }
