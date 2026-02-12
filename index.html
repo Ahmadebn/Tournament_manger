@@ -84,10 +84,10 @@ onSnapshot(collection(db,"tournaments"), snapshot => {
 
  snapshot.forEach(doc=>{
    grid.innerHTML += `
-   <a class="card">
-     <h3>${doc.data().name}</h3>
-   </a>
-   `;
+<a href="tournament.html?id=${doc.id}" class="card">
+  <h3>${doc.data().name}</h3>
+</a>
+`;
  });
 
 });
