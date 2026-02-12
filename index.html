@@ -54,16 +54,45 @@ body {
 <div class="container">
 <h1>My Tournaments</h1>
 
-<div class="tournament-grid">
-    <a href="tournament.html" class="card">
-        <h3>Example Tournament</h3>
-    </a>
-</div>
+<div class="tournament-grid" id="tournamentGrid"></div>
 
 <a href="add_tournament.html" class="add-btn">+ Add New Tournament</a>
 
 </div>
+<script type="module">
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+const firebaseConfig = {
+ apiKey: "AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
+ authDomain: "football-manager-a8c11.firebaseapp.com",
+ projectId: "football-manager-a8c11",
+ storageBucket: "football-manager-a8c11.firebasestorage.app",
+ messagingSenderId: "78452499051",
+ appId: "1:78452499051:web:5f26427727d1d17024c72e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const grid = document.getElementById("tournamentGrid");
+
+onSnapshot(collection(db,"tournaments"), snapshot => {
+
+ grid.innerHTML = "";
+
+ snapshot.forEach(doc=>{
+   grid.innerHTML += `
+   <a class="card">
+     <h3>${doc.data().name}</h3>
+   </a>
+   `;
+ });
+
+});
+
+</script>
 </body>
     <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
@@ -81,6 +110,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-console.log("Firebase connected");
-    </script>
+
+</script>
 </html>
