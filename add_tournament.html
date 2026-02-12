@@ -61,6 +61,7 @@ ul{
 
 
 <script type="module">
+    
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
@@ -88,6 +89,7 @@ window.addTeam = function(){
 }
 
 window.createTournament = async function(){
+ console.log("BUTTON CLICKED");
  let name = tourneyName.value.trim();
  if(!name || teams.length==0){
    alert("Add name and teams");
@@ -101,6 +103,8 @@ window.createTournament = async function(){
 
  window.location="index.html";
 }
+    
+console.log("SCRIPT LOADED");
 </script>
 
 </body>
