@@ -7,27 +7,29 @@
 
 <style>
 body{
- font-family:sans-serif;
- background:#f4f4f4;
- padding:20px;
- margin-bottom:80px;
+font-family:sans-serif;
+background:#f4f4f4;
+padding:20px;
+margin-bottom:90px;
 }
-.container{max-width:900px;margin:auto;}
-.section{display:none;background:white;padding:15px;margin-bottom:20px;border-radius:8px;}
-.section.active{display:block;}
-table{width:100%;border-collapse:collapse;}
-th,td{border:1px solid #ccc;padding:8px;text-align:center;}
-.round-card{background:#eee;padding:15px;margin-bottom:20px;border-radius:8px;}
-.match-card{background:white;padding:10px;margin:10px 0;border-radius:5px;display:flex;justify-content:space-around;}
-.add-match-btn{background:#2ecc71;color:white;border:none;padding:10px 15px;border-radius:5px;}
-.navbar{position:fixed;bottom:0;left:0;right:0;background:#2c3e50;display:flex;justify-content:space-around;padding:15px 0;}
-.nav-item{color:white;font-weight:bold;cursor:pointer;}
-.nav-item.active{color:#2ecc71;}
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);}
-.modal-content{background:white;padding:20px;width:90%;max-width:400px;margin:100px auto;border-radius:8px;}
-select,input{width:100%;padding:10px;margin:10px 0;}
+.container{max-width:900px;margin:auto}
+.section{display:none;background:#fff;padding:15px;border-radius:8px}
+.section.active{display:block}
+.round-card{background:#eee;padding:10px;margin-bottom:15px;border-radius:8px}
+.match-card{background:#fff;padding:10px;margin:8px 0;border-radius:6px;display:flex;justify-content:space-between;align-items:center}
+.match-card span{cursor:pointer}
+button{padding:6px 10px;border:none;border-radius:4px}
+.add-match-btn{background:#2ecc71;color:#fff}
+.del{background:#e74c3c;color:white}
+.navbar{position:fixed;bottom:0;left:0;right:0;background:#2c3e50;display:flex;justify-content:space-around;padding:15px 0}
+.nav-item{color:white;font-weight:bold}
+.nav-item.active{color:#2ecc71}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5)}
+.modal-content{background:white;padding:20px;width:90%;max-width:400px;margin:120px auto;border-radius:8px}
+input,select{width:100%;padding:10px;margin:10px 0}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #ccc;padding:5px;text-align:center;font-size:13px}
 </style>
-
 </head>
 
 <body>
@@ -38,18 +40,24 @@ select,input{width:100%;padding:10px;margin:10px 0;}
 
 <div id="fixtures" class="section active">
 <h2>Fixtures</h2>
-<button class="add-match-btn" onclick="openMatchModal()">+ Add Match</button>
+<button class="add-match-btn" onclick="openAdd()">+ Add Match</button>
 <div id="fixturesList"></div>
 </div>
 
 <div id="scores" class="section">
 <h2>Scores</h2>
+<div id="scoresList"></div>
 </div>
 
 <div id="table" class="section">
-<h2>Table</h2>
+<h2>Standings</h2>
 <table>
-<thead><tr><th>Team</th><th>Points</th></tr></thead>
+<thead>
+<tr>
+<th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
+<th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
+</tr>
+</thead>
 <tbody id="standings"></tbody>
 </table>
 </div>
@@ -57,19 +65,31 @@ select,input{width:100%;padding:10px;margin:10px 0;}
 </div>
 
 <nav class="navbar">
-<div class="nav-item active" onclick="showSection('fixtures',this)">Fixtures</div>
-<div class="nav-item" onclick="showSection('scores',this)">Scores</div>
-<div class="nav-item" onclick="showSection('table',this)">Table</div>
+<div class="nav-item active" onclick="show('fixtures',this)">Fixtures</div>
+<div class="nav-item" onclick="show('scores',this)">Scores</div>
+<div class="nav-item" onclick="show('table',this)">Table</div>
 </nav>
 
-<div id="matchModal" class="modal">
+<!-- ADD MATCH -->
+<div id="addModal" class="modal">
 <div class="modal-content">
 <h3>Add Match</h3>
-<input type="number" id="roundInput" value="1">
-<select id="homeTeamSelect"></select>
-<select id="awayTeamSelect"></select>
-<button onclick="closeMatchModal()">Cancel</button>
+<input id="roundInput" type="number" value="1">
+<select id="home"></select>
+<select id="away"></select>
+<button onclick="closeAll()">Cancel</button>
 <button onclick="saveMatch()">Save</button>
+</div>
+</div>
+
+<!-- RESULT -->
+<div id="resultModal" class="modal">
+<div class="modal-content">
+<h3>Enter Result</h3>
+<input id="sh" type="number" placeholder="Home goals">
+<input id="sa" type="number" placeholder="Away goals">
+<button onclick="closeAll()">Cancel</button>
+<button onclick="saveResult()">Confirm</button>
 </div>
 </div>
 
@@ -79,106 +99,140 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebas
 import { getFirestore,doc,onSnapshot,updateDoc,arrayUnion } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
 const firebaseConfig={
- apiKey:"AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
- authDomain:"football-manager-a8c11.firebaseapp.com",
- projectId:"football-manager-a8c11",
- storageBucket:"football-manager-a8c11.firebasestorage.app",
- messagingSenderId:"78452499051",
- appId:"1:78452499051:web:5f26427727d1d17024c72e"
+apiKey:"AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
+authDomain:"football-manager-a8c11.firebaseapp.com",
+projectId:"football-manager-a8c11",
+storageBucket:"football-manager-a8c11.appspot.com",
+messagingSenderId:"78452499051",
+appId:"1:78452499051:web:5f26427727d1d17024c72e"
 };
 
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
 
-const title=document.getElementById("title");
-const standings=document.getElementById("standings");
-const fixturesList=document.getElementById("fixturesList");
-const homeTeamSelect=document.getElementById("homeTeamSelect");
-const awayTeamSelect=document.getElementById("awayTeamSelect");
-const matchModal=document.getElementById("matchModal");
-const roundInput=document.getElementById("roundInput");
-
 const id=new URLSearchParams(location.search).get("id");
 const ref=doc(db,"tournaments",id);
 
-let tournament=null;
+let T=null;
+let currentIndex=null;
 
-onSnapshot(ref,snap=>{
- if(!snap.exists())return;
- tournament=snap.data();
- render();
+onSnapshot(ref,s=>{
+if(!s.exists())return;
+T=s.data();
+render();
 });
 
 function render(){
 
-title.innerText=tournament.name;
+title.innerText=T.name;
 
-standings.innerHTML="";
-tournament.teams.forEach(t=>{
- standings.innerHTML+=`<tr><td>${t}</td><td>0</td></tr>`;
+home.innerHTML="";
+away.innerHTML="";
+T.teams.forEach(t=>{
+home.innerHTML+=`<option>${t}</option>`;
+away.innerHTML+=`<option>${t}</option>`;
 });
 
 fixturesList.innerHTML="";
+scoresList.innerHTML="";
 
-if(tournament.matches){
- const rounds={};
- tournament.matches.forEach(m=>{
-  if(!rounds[m.round])rounds[m.round]=[];
-  rounds[m.round].push(m);
- });
-
- Object.keys(rounds).sort((a,b)=>a-b).forEach(r=>{
-  let h=`<div class="round-card"><h3>Round ${r}</h3>`;
-  rounds[r].forEach(m=>{
-   h+=`<div class="match-card">${m.home} vs ${m.away}</div>`;
-  });
-  h+="</div>";
-  fixturesList.innerHTML+=h;
- });
-}
-
-homeTeamSelect.innerHTML="";
-awayTeamSelect.innerHTML="";
-
-tournament.teams.forEach(t=>{
- homeTeamSelect.innerHTML+=`<option>${t}</option>`;
- awayTeamSelect.innerHTML+=`<option>${t}</option>`;
+const stats={};
+T.teams.forEach(t=>{
+stats[t]={p:0,w:0,d:0,l:0,gf:0,ga:0};
 });
 
+if(T.matches){
+
+T.matches.forEach((m,i)=>{
+
+if(m.scoreHome!=null){
+
+scoresList.innerHTML+=`
+<div class="match-card">
+${m.home} ${m.scoreHome} - ${m.scoreAway} ${m.away}
+</div>`;
+
+let h=stats[m.home], a=stats[m.away];
+h.p++;a.p++;
+h.gf+=m.scoreHome;h.ga+=m.scoreAway;
+a.gf+=m.scoreAway;a.ga+=m.scoreHome;
+
+if(m.scoreHome>m.scoreAway){h.w++;a.l++;}
+else if(m.scoreHome<m.scoreAway){a.w++;h.l++;}
+else{h.d++;a.d++;}
+
+}else{
+
+fixturesList.innerHTML+=`
+<div class="match-card">
+<span onclick="openResult(${i})">${m.home} vs ${m.away}</span>
+<button class="del" onclick="del(${i})">X</button>
+</div>`;
 }
 
-window.showSection=(id,e)=>{
- document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
- document.getElementById(id).classList.add("active");
- document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
- e.classList.add("active");
+});
+}
+
+const arr=Object.entries(stats).map(([k,v])=>{
+v.team=k;
+v.gd=v.gf-v.ga;
+v.pts=v.w*3+v.d;
+return v;
+});
+
+arr.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+
+standings.innerHTML="";
+arr.forEach(t=>{
+standings.innerHTML+=`
+<tr>
+<td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+<td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
+</tr>`;
+});
+}
+
+window.show=(id,e)=>{
+document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+e.classList.add("active");
 };
 
-window.openMatchModal=()=>matchModal.style.display="block";
-window.closeMatchModal=()=>matchModal.style.display="none";
+window.openAdd=()=>addModal.style.display="block";
+window.closeAll=()=>{addModal.style.display=resultModal.style.display="none"}
 
 window.saveMatch=async()=>{
+if(home.value==away.value)return alert("Same team!");
+await updateDoc(ref,{
+matches:arrayUnion({
+round:+roundInput.value,
+home:home.value,
+away:away.value,
+scoreHome:null,
+scoreAway:null
+})
+});
+closeAll();
+};
 
- if(homeTeamSelect.value===awayTeamSelect.value){
-   alert("Same team selected");
-   return;
- }
+window.del=async(i)=>{
+T.matches.splice(i,1);
+await updateDoc(ref,{matches:T.matches});
+};
 
- await updateDoc(ref,{
-  matches:arrayUnion({
-   id:crypto.randomUUID(),
-   round:+roundInput.value,
-   home:homeTeamSelect.value,
-   away:awayTeamSelect.value,
-   scoreHome:null,
-   scoreAway:null
-  })
- });
+window.openResult=i=>{
+currentIndex=i;
+resultModal.style.display="block";
+};
 
- closeMatchModal();
+window.saveResult=async()=>{
+T.matches[currentIndex].scoreHome=+sh.value;
+T.matches[currentIndex].scoreAway=+sa.value;
+await updateDoc(ref,{matches:T.matches});
+closeAll();
 };
 
 </script>
-
 </body>
  </html>
