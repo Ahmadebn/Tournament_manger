@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tournament</title>
+
 <link rel="stylesheet" href="style.css">
 </head>
 
@@ -11,20 +12,24 @@
 
 <div class="container">
 
-<h1 id="title"></h1>
-
-<select id="roundFilter" onchange="render()">
-<option value="all">All Rounds</option>
-</select>
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+  <button onclick="location.href='index.html'" style="background: var(--border); padding: 8px 12px; font-size: 0.9rem;">← Back</button>
+  <h1 id="title" style="margin: 0; flex-grow: 1;"></h1>
+</div>
 
 <div id="fixtures" class="section active">
-<h2>Fixtures</h2>
-<button class="add-match-btn" onclick="addRound()">+ Add Next Round</button>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h2>Fixtures</h2>
+    <select id="roundFilter" onchange="render()" style="padding: 5px; border-radius: 5px; border: 1px solid var(--border);"></select>
+</div>
+<button class="add-match-btn" onclick="openAdd()">+ Add Match</button>
 <div id="fixturesList"></div>
 </div>
 
 <div id="scores" class="section">
-<h2>Scores</h2>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h2>Scores</h2>
+</div>
 <div id="scoresList"></div>
 </div>
 
@@ -49,154 +54,270 @@
 <div class="nav-item" onclick="show('table',this)">Table</div>
 </nav>
 
-<div id="editModal" class="modal">
+<!-- ADD MATCH -->
+<div id="addModal" class="modal">
 <div class="modal-content">
-<h3>Edit Match</h3>
-<select id="eh"></select>
-<select id="ea"></select>
-<input id="sh" type="number">
-<input id="sa" type="number">
-<button onclick="deleteResult()">Delete Result</button>
-<button onclick="deleteMatch()">Delete Match</button>
-<button onclick="saveEdit()">Save</button>
+<h3>Add Match</h3>
+<input id="roundInput" type="number" value="1">
+<select id="home"></select>
+<select id="away"></select>
+<button onclick="closeAll()">Cancel</button>
+<button onclick="saveMatch()">Save</button>
+</div>
+</div>
+
+<!-- RESULT -->
+<div id="resultModal" class="modal">
+<div class="modal-content">
+<h3>Enter Result</h3>
+<input id="sh" type="number" placeholder="Home goals">
+<input id="sa" type="number" placeholder="Away goals">
+<button onclick="closeAll()">Cancel</button>
+<button onclick="saveResult()">Confirm</button>
 </div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getFirestore,doc,onSnapshot,updateDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFirestore,doc,onSnapshot,updateDoc,arrayUnion } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-const app=initializeApp({
+const firebaseConfig={
 apiKey:"AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
 authDomain:"football-manager-a8c11.firebaseapp.com",
-projectId:"football-manager-a8c11"
-});
+projectId:"football-manager-a8c11",
+storageBucket:"football-manager-a8c11.appspot.com",
+messagingSenderId:"78452499051",
+appId:"1:78452499051:web:5f26427727d1d17024c72e"
+};
 
+const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
+
 const id=new URLSearchParams(location.search).get("id");
 const ref=doc(db,"tournaments",id);
 
-let T=null, idx=null;
+let T=null;
+let currentIndex=null;
 
-onSnapshot(ref,s=>{T=s.data();render();});
+onSnapshot(ref,s=>{
+if(!s.exists())return;
+T=s.data();
+if(!T.matches) T.matches = [];
+updateRoundFilter();
+render();
+});
+
+function updateRoundFilter() {
+    const rounds = [...new Set(T.matches.map(m => m.round))].sort((a,b) => a-b);
+    const currentFilter = roundFilter.value;
+    roundFilter.innerHTML = '<option value="all">All Rounds</option>';
+    rounds.forEach(r => {
+        roundFilter.innerHTML += `<option value="${r}">Round ${r}</option>`;
+    });
+    if (currentFilter) roundFilter.value = currentFilter;
+}
 
 function render(){
 
 title.innerText=T.name;
+
+const selectedRound = roundFilter.value;
+
+home.innerHTML="";
+away.innerHTML="";
+T.teams.forEach(t=>{
+home.innerHTML+=`<option>${t}</option>`;
+away.innerHTML+=`<option>${t}</option>`;
+});
+
 fixturesList.innerHTML="";
 scoresList.innerHTML="";
-roundFilter.innerHTML='<option value="all">All Rounds</option>';
 
-const rounds=[...new Set((T.matches||[]).map(m=>m.round))].sort((a,b)=>a-b);
-rounds.forEach(r=>roundFilter.innerHTML+=`<option>${r}</option>`);
-
-const filter=roundFilter.value;
-
-const grouped={};
-(T.matches||[]).forEach((m,i)=>{
-if(filter!=="all" && m.round!=filter)return;
-if(!grouped[m.round])grouped[m.round]=[];
-grouped[m.round].push({...m,i});
+const stats={};
+T.teams.forEach(t=>{
+stats[t]={p:0,w:0,d:0,l:0,gf:0,ga:0};
 });
 
-Object.keys(grouped).forEach(r=>{
-fixturesList.innerHTML+=`<h3>Round ${r}</h3>`;
-scoresList.innerHTML+=`<h3>Round ${r}</h3>`;
+// Group matches by round
+const matchesByRound = {};
+T.matches.forEach((m, i) => {
+    if (selectedRound !== "all" && m.round != selectedRound) return;
+    if (!matchesByRound[m.round]) matchesByRound[m.round] = [];
+    matchesByRound[m.round].push({ ...m, originalIndex: i });
+});
 
-grouped[r].forEach(m=>{
-const card=`<div class="match-card" onclick="openEdit(${m.i})">${m.home} ${m.scoreHome??""} ${m.scoreHome!=null?"-":""} ${m.scoreAway??""} ${m.away}</div>`;
-m.scoreHome==null?fixturesList.innerHTML+=card:scoresList.innerHTML+=card;
+const sortedRounds = Object.keys(matchesByRound).sort((a,b) => a-b);
+
+sortedRounds.forEach(r => {
+    const roundDiv = document.createElement('div');
+    roundDiv.className = 'round-container';
+    roundDiv.innerHTML = `<h3 class="round-title">Round ${r}</h3>`;
+    
+    const roundFixtures = document.createElement('div');
+    const roundScores = document.createElement('div');
+
+    matchesByRound[r].forEach(m => {
+        const i = m.originalIndex;
+        if(m.scoreHome!=null){
+            roundScores.innerHTML+=`
+            <div class="match-card">
+            <span>${m.home} ${m.scoreHome} - ${m.scoreAway} ${m.away}</span>
+            <div style="display:flex; gap:5px;">
+                <button class="edit-btn" onclick="openResult(${i})">✎</button>
+                <button class="del" onclick="delScore(${i})">X</button>
+            </div>
+            </div>`;
+
+            let h=stats[m.home], a=stats[m.away];
+            h.p++;a.p++;
+            h.gf+=m.scoreHome;h.ga+=m.scoreAway;
+            a.gf+=m.scoreAway;a.ga+=m.scoreHome;
+
+            if(m.scoreHome>m.scoreAway){h.w++;a.l++;}
+            else if(m.scoreHome<m.scoreAway){a.w++;h.l++;}
+            else{h.d++;a.d++;}
+        }else{
+            roundFixtures.innerHTML+=`
+            <div class="match-card">
+            <span onclick="openResult(${i})">${m.home} vs ${m.away}</span>
+            <button class="del" onclick="del(${i})">X</button>
+            </div>`;
+        }
+    });
+
+    if (roundFixtures.innerHTML) {
+        const fWrapper = document.createElement('div');
+        fWrapper.className = 'round-section';
+        fWrapper.innerHTML = `<h3 class="round-title">Round ${r}</h3>`;
+        fWrapper.appendChild(roundFixtures);
+        fixturesList.appendChild(fWrapper);
+    }
+    if (roundScores.innerHTML) {
+        const sWrapper = document.createElement('div');
+        sWrapper.className = 'round-section';
+        sWrapper.innerHTML = `<h3 class="round-title">Round ${r}</h3>`;
+        sWrapper.appendChild(roundScores);
+        scoresList.appendChild(sWrapper);
+    }
 });
+
+const arr=Object.entries(stats).map(([k,v])=>{
+v.team=k;
+v.gd=v.gf-v.ga;
+v.pts=v.w*3+v.d;
+return v;
 });
+
+arr.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
 
 standings.innerHTML="";
-const S={};
-T.teams.forEach(t=>S[t]={p:0,w:0,d:0,l:0,gf:0,ga:0});
-
-(T.matches||[]).filter(m=>m.scoreHome!=null).forEach(m=>{
-const h=S[m.home],a=S[m.away];
-h.p++;a.p++;
-h.gf+=m.scoreHome;h.ga+=m.scoreAway;
-a.gf+=m.scoreAway;a.ga+=m.scoreHome;
-if(m.scoreHome>m.scoreAway){h.w++;a.l++}
-else if(m.scoreHome<m.scoreAway){a.w++;h.l++}
-else{h.d++;a.d++}
-});
-
-const arr=Object.entries(S).map(([k,v])=>{
-v.team=k;v.gd=v.gf-v.ga;v.pts=v.w*3+v.d;return v;
-}).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
-
 arr.forEach(t=>{
-standings.innerHTML+=`<tr><td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td></tr>`;
+standings.innerHTML+=`
+<tr>
+<td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
+<td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
+</tr>`;
 });
 }
 
-window.show=(i,e)=>{
+window.show=(id,e)=>{
 document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-document.getElementById(i).classList.add("active");
+document.getElementById(id).classList.add("active");
 document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
 e.classList.add("active");
 };
 
-window.addRound=async()=>{
-if(!T.matches)T.matches=[];
-const round=Math.max(0,...T.matches.map(m=>m.round||0))+1;
-const teams=[...T.teams];
-if(teams.length%2)teams.push("BYE");
+window.openAdd=()=> {
+    // Determine next round and home/away swap
+    const lastMatch = T.matches[T.matches.length - 1];
+    let nextRound = lastMatch ? lastMatch.round : 1;
+    
+    // Check if current round is "full" (all teams played once)
+    const currentRoundMatches = T.matches.filter(m => m.round === nextRound);
+    if (currentRoundMatches.length >= T.teams.length / 2) {
+        nextRound++;
+    }
+    
+    roundInput.value = nextRound;
+    
+    // Auto-select teams that haven't played in this round yet
+    const playedTeams = new Set();
+    currentRoundMatches.forEach(m => {
+        playedTeams.add(m.home);
+        playedTeams.add(m.away);
+    });
+    
+    const availableTeams = T.teams.filter(t => !playedTeams.has(t));
+    if (availableTeams.length >= 2) {
+        home.value = availableTeams[0];
+        away.value = availableTeams[1];
+        
+        // Handle home/away swap for return leg (round 20+)
+        if (nextRound >= 20) {
+            const previousMatch = T.matches.find(m => 
+                (m.home === availableTeams[0] && m.away === availableTeams[1]) ||
+                (m.home === availableTeams[1] && m.away === availableTeams[0])
+            );
+            if (previousMatch && previousMatch.home === availableTeams[0]) {
+                home.value = availableTeams[1];
+                away.value = availableTeams[0];
+            }
+        }
+    }
 
-const used=new Set(T.matches.map(m=>[m.home,m.away].sort().join()));
-
-let list=[];
-for(let i=0;i<teams.length;i+=2){
-let a=teams[i],b=teams[i+1];
-if(round>=20)[a,b]=[b,a];
-if(!used.has([a,b].sort().join()))
-list.push({round,home:a,away:b,scoreHome:null,scoreAway:null});
+    addModal.style.display="block";
 }
 
-await updateDoc(ref,{matches:[...(T.matches||[]),...list]});
-};
+window.closeAll=()=>{addModal.style.display=resultModal.style.display="none"}
 
-window.openEdit=i=>{
-idx=i;
-editModal.style.display="block";
-eh.innerHTML=ea.innerHTML="";
-T.teams.forEach(t=>{
-eh.innerHTML+=`<option>${t}</option>`;
-ea.innerHTML+=`<option>${t}</option>`;
+window.saveMatch=async()=>{
+if(home.value==away.value)return alert("Same team!");
+
+// Avoid repeating a match in the same round
+const exists = T.matches.some(m => m.round == roundInput.value && 
+    ((m.home == home.value && m.away == away.value) || (m.home == away.value && m.away == home.value)));
+if (exists) return alert("Match already exists in this round!");
+
+await updateDoc(ref,{
+matches:arrayUnion({
+round:+roundInput.value,
+home:home.value,
+away:away.value,
+scoreHome:null,
+scoreAway:null
+})
 });
-eh.value=T.matches[i].home;
-ea.value=T.matches[i].away;
-sh.value=T.matches[i].scoreHome??"";
-sa.value=T.matches[i].scoreAway??"";
+closeAll();
 };
 
-window.saveEdit=async()=>{
-Object.assign(T.matches[idx],{
-home:eh.value,
-away:ea.value,
-scoreHome:sh.value==""?null:+sh.value,
-scoreAway:sa.value==""?null:+sa.value
-});
+window.del=async(i)=>{
+if(!confirm("Delete match?")) return;
+T.matches.splice(i,1);
 await updateDoc(ref,{matches:T.matches});
-editModal.style.display="none";
 };
 
-window.deleteResult=async()=>{
-T.matches[idx].scoreHome=null;
-T.matches[idx].scoreAway=null;
+window.delScore=async(i)=>{
+if(!confirm("Delete result and move back to fixtures?")) return;
+T.matches[i].scoreHome = null;
+T.matches[i].scoreAway = null;
 await updateDoc(ref,{matches:T.matches});
-editModal.style.display="none";
 };
 
-window.deleteMatch=async()=>{
-T.matches.splice(idx,1);
+window.openResult=i=>{
+currentIndex=i;
+sh.value = T.matches[i].scoreHome !== null ? T.matches[i].scoreHome : "";
+sa.value = T.matches[i].scoreAway !== null ? T.matches[i].scoreAway : "";
+resultModal.style.display="block";
+};
+
+window.saveResult=async()=>{
+T.matches[currentIndex].scoreHome=+sh.value;
+T.matches[currentIndex].scoreAway=+sa.value;
 await updateDoc(ref,{matches:T.matches});
-editModal.style.display="none";
+closeAll();
 };
 
 </script>
 </body>
-                       </html>
+  </html>
