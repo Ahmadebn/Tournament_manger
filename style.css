@@ -153,7 +153,9 @@ td:first-child {
 tr:last-child td {
     border-bottom: none;
 }
-
+table table tbody tr td:last-child# {
+    background-color :#800020;
+}
 /* Navbar */
 .navbar {
     position: fixed;
