@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tournament</title>
-
 <link rel="stylesheet" href="style.css">
 </head>
 
@@ -14,9 +13,13 @@
 
 <h1 id="title"></h1>
 
+<select id="roundFilter" onchange="render()">
+<option value="all">All Rounds</option>
+</select>
+
 <div id="fixtures" class="section active">
 <h2>Fixtures</h2>
-<button class="add-match-btn" onclick="openAdd()">+ Add Match</button>
+<button class="add-match-btn" onclick="addRound()">+ Add Next Round</button>
 <div id="fixturesList"></div>
 </div>
 
@@ -46,171 +49,154 @@
 <div class="nav-item" onclick="show('table',this)">Table</div>
 </nav>
 
-<!-- ADD MATCH -->
-<div id="addModal" class="modal">
+<div id="editModal" class="modal">
 <div class="modal-content">
-<h3>Add Match</h3>
-<input id="roundInput" type="number" value="1">
-<select id="home"></select>
-<select id="away"></select>
-<button onclick="closeAll()">Cancel</button>
-<button onclick="saveMatch()">Save</button>
-</div>
-</div>
-
-<!-- RESULT -->
-<div id="resultModal" class="modal">
-<div class="modal-content">
-<h3>Enter Result</h3>
-<input id="sh" type="number" placeholder="Home goals">
-<input id="sa" type="number" placeholder="Away goals">
-<button onclick="closeAll()">Cancel</button>
-<button onclick="saveResult()">Confirm</button>
+<h3>Edit Match</h3>
+<select id="eh"></select>
+<select id="ea"></select>
+<input id="sh" type="number">
+<input id="sa" type="number">
+<button onclick="deleteResult()">Delete Result</button>
+<button onclick="deleteMatch()">Delete Match</button>
+<button onclick="saveEdit()">Save</button>
 </div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getFirestore,doc,onSnapshot,updateDoc,arrayUnion } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getFirestore,doc,onSnapshot,updateDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-const firebaseConfig={
+const app=initializeApp({
 apiKey:"AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
 authDomain:"football-manager-a8c11.firebaseapp.com",
-projectId:"football-manager-a8c11",
-storageBucket:"football-manager-a8c11.appspot.com",
-messagingSenderId:"78452499051",
-appId:"1:78452499051:web:5f26427727d1d17024c72e"
-};
+projectId:"football-manager-a8c11"
+});
 
-const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
-
 const id=new URLSearchParams(location.search).get("id");
 const ref=doc(db,"tournaments",id);
 
-let T=null;
-let currentIndex=null;
+let T=null, idx=null;
 
-onSnapshot(ref,s=>{
-if(!s.exists())return;
-T=s.data();
-render();
-});
+onSnapshot(ref,s=>{T=s.data();render();});
 
 function render(){
 
 title.innerText=T.name;
-
-home.innerHTML="";
-away.innerHTML="";
-T.teams.forEach(t=>{
-home.innerHTML+=`<option>${t}</option>`;
-away.innerHTML+=`<option>${t}</option>`;
-});
-
 fixturesList.innerHTML="";
 scoresList.innerHTML="";
+roundFilter.innerHTML='<option value="all">All Rounds</option>';
 
-const stats={};
-T.teams.forEach(t=>{
-stats[t]={p:0,w:0,d:0,l:0,gf:0,ga:0};
+const rounds=[...new Set((T.matches||[]).map(m=>m.round))].sort((a,b)=>a-b);
+rounds.forEach(r=>roundFilter.innerHTML+=`<option>${r}</option>`);
+
+const filter=roundFilter.value;
+
+const grouped={};
+(T.matches||[]).forEach((m,i)=>{
+if(filter!=="all" && m.round!=filter)return;
+if(!grouped[m.round])grouped[m.round]=[];
+grouped[m.round].push({...m,i});
 });
 
-if(T.matches){
+Object.keys(grouped).forEach(r=>{
+fixturesList.innerHTML+=`<h3>Round ${r}</h3>`;
+scoresList.innerHTML+=`<h3>Round ${r}</h3>`;
 
-T.matches.forEach((m,i)=>{
+grouped[r].forEach(m=>{
+const card=`<div class="match-card" onclick="openEdit(${m.i})">${m.home} ${m.scoreHome??""} ${m.scoreHome!=null?"-":""} ${m.scoreAway??""} ${m.away}</div>`;
+m.scoreHome==null?fixturesList.innerHTML+=card:scoresList.innerHTML+=card;
+});
+});
 
-if(m.scoreHome!=null){
+standings.innerHTML="";
+const S={};
+T.teams.forEach(t=>S[t]={p:0,w:0,d:0,l:0,gf:0,ga:0});
 
-scoresList.innerHTML+=`
-<div class="match-card">
-${m.home} ${m.scoreHome} - ${m.scoreAway} ${m.away}
-</div>`;
-
-let h=stats[m.home], a=stats[m.away];
+(T.matches||[]).filter(m=>m.scoreHome!=null).forEach(m=>{
+const h=S[m.home],a=S[m.away];
 h.p++;a.p++;
 h.gf+=m.scoreHome;h.ga+=m.scoreAway;
 a.gf+=m.scoreAway;a.ga+=m.scoreHome;
-
-if(m.scoreHome>m.scoreAway){h.w++;a.l++;}
-else if(m.scoreHome<m.scoreAway){a.w++;h.l++;}
-else{h.d++;a.d++;}
-
-}else{
-
-fixturesList.innerHTML+=`
-<div class="match-card">
-<span onclick="openResult(${i})">${m.home} vs ${m.away}</span>
-<button class="del" onclick="del(${i})">X</button>
-</div>`;
-}
-
-});
-}
-
-const arr=Object.entries(stats).map(([k,v])=>{
-v.team=k;
-v.gd=v.gf-v.ga;
-v.pts=v.w*3+v.d;
-return v;
+if(m.scoreHome>m.scoreAway){h.w++;a.l++}
+else if(m.scoreHome<m.scoreAway){a.w++;h.l++}
+else{h.d++;a.d++}
 });
 
-arr.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+const arr=Object.entries(S).map(([k,v])=>{
+v.team=k;v.gd=v.gf-v.ga;v.pts=v.w*3+v.d;return v;
+}).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
 
-standings.innerHTML="";
 arr.forEach(t=>{
-standings.innerHTML+=`
-<tr>
-<td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
-<td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
-</tr>`;
+standings.innerHTML+=`<tr><td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td></tr>`;
 });
 }
 
-window.show=(id,e)=>{
+window.show=(i,e)=>{
 document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-document.getElementById(id).classList.add("active");
+document.getElementById(i).classList.add("active");
 document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
 e.classList.add("active");
 };
 
-window.openAdd=()=>addModal.style.display="block";
-window.closeAll=()=>{addModal.style.display=resultModal.style.display="none"}
+window.addRound=async()=>{
+if(!T.matches)T.matches=[];
+const round=Math.max(0,...T.matches.map(m=>m.round||0))+1;
+const teams=[...T.teams];
+if(teams.length%2)teams.push("BYE");
 
-window.saveMatch=async()=>{
-if(home.value==away.value)return alert("Same team!");
-await updateDoc(ref,{
-matches:arrayUnion({
-round:+roundInput.value,
-home:home.value,
-away:away.value,
-scoreHome:null,
-scoreAway:null
-})
+const used=new Set(T.matches.map(m=>[m.home,m.away].sort().join()));
+
+let list=[];
+for(let i=0;i<teams.length;i+=2){
+let a=teams[i],b=teams[i+1];
+if(round>=20)[a,b]=[b,a];
+if(!used.has([a,b].sort().join()))
+list.push({round,home:a,away:b,scoreHome:null,scoreAway:null});
+}
+
+await updateDoc(ref,{matches:[...(T.matches||[]),...list]});
+};
+
+window.openEdit=i=>{
+idx=i;
+editModal.style.display="block";
+eh.innerHTML=ea.innerHTML="";
+T.teams.forEach(t=>{
+eh.innerHTML+=`<option>${t}</option>`;
+ea.innerHTML+=`<option>${t}</option>`;
 });
-closeAll();
+eh.value=T.matches[i].home;
+ea.value=T.matches[i].away;
+sh.value=T.matches[i].scoreHome??"";
+sa.value=T.matches[i].scoreAway??"";
 };
 
-window.del=async(i)=>{
-T.matches.splice(i,1);
+window.saveEdit=async()=>{
+Object.assign(T.matches[idx],{
+home:eh.value,
+away:ea.value,
+scoreHome:sh.value==""?null:+sh.value,
+scoreAway:sa.value==""?null:+sa.value
+});
 await updateDoc(ref,{matches:T.matches});
+editModal.style.display="none";
 };
 
-window.openResult=i=>{
-currentIndex=i;
-resultModal.style.display="block";
-};
-
-window.saveResult=async()=>{
-T.matches[currentIndex].scoreHome=+sh.value;
-T.matches[currentIndex].scoreAway=+sa.value;
+window.deleteResult=async()=>{
+T.matches[idx].scoreHome=null;
+T.matches[idx].scoreAway=null;
 await updateDoc(ref,{matches:T.matches});
-closeAll();
+editModal.style.display="none";
+};
+
+window.deleteMatch=async()=>{
+T.matches.splice(idx,1);
+await updateDoc(ref,{matches:T.matches});
+editModal.style.display="none";
 };
 
 </script>
 </body>
- </html>
-
-
+                       </html>
