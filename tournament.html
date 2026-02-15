@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tournament</title>
-<link rel="stylesheet" href="syle.css">
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -84,7 +84,16 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import { getFirestore,doc,onSnapshot,updateDoc,arrayUnion } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
 
-const firebaseConfig={ /* your config */ };
+/* YOUR CONFIG */
+const firebaseConfig={
+apiKey:"AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
+authDomain:"football-manager-a8c11.firebaseapp.com",
+projectId:"football-manager-a8c11",
+storageBucket:"football-manager-a8c11.appspot.com",
+messagingSenderId:"78452499051",
+appId:"1:78452499051:web:5f26427727d1d17024c72e"
+};
+
 const app=initializeApp(firebaseConfig);
 const db=getFirestore(app);
 
@@ -120,7 +129,7 @@ if(m.scoreHome==null){
 fixturesList.innerHTML+=`
 <div class="match-card">
 <span onclick="openResult(${i})">${m.home} vs ${m.away}</span>
-<button class="del" onclick="del(${i})">X</button>
+<button class="del" onclick="delMatch(${i})">X</button>
 </div>`;
 }else{
 scoresList.innerHTML+=`
@@ -145,8 +154,10 @@ v.team=k;v.gd=v.gf-v.ga;v.pts=v.w*3+v.d;return v;
 standings.innerHTML="";
 arr.forEach(t=>{
 standings.innerHTML+=`
-<tr><td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td>
-<td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td></tr>`;
+<tr>
+<td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td>
+<td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
+</tr>`;
 });
 }
 
@@ -154,6 +165,7 @@ window.openAdd=()=>{addModal.style.display="block";}
 window.closeAll=()=>{addModal.style.display=resultModal.style.display="none";}
 
 window.saveMatch=async()=>{
+if(home.value===away.value) return alert("Same team!");
 await updateDoc(ref,{
 matches:arrayUnion({
 id:Date.now(),
@@ -182,28 +194,34 @@ m.cards.forEach(c=>addCardRow(c));
 resultModal.style.display="block";
 };
 
-function addGoal(){
-addGoalRow({team:"home",player:"",minute:""});
-}
+/* FIXED RESTORE */
+function addGoal(){ addGoalRow({team:"home",player:"",minute:""}); }
 function addGoalRow(g){
 goalsBox.innerHTML+=`
 <div class="row">
-<select class="gteam"><option>home</option><option>away</option></select>
-<input class="gplayer" placeholder="Player">
-<input class="gmin" type="number" placeholder="Min">
+<select class="gteam">
+<option ${g.team=="home"?"selected":""}>home</option>
+<option ${g.team=="away"?"selected":""}>away</option>
+</select>
+<input class="gplayer" value="${g.player}">
+<input class="gmin" type="number" value="${g.minute}">
 </div>`;
 }
 
-function addCard(){
-addCardRow({team:"home",player:"",minute:"",type:"yellow"});
-}
+function addCard(){ addCardRow({team:"home",player:"",minute:"",type:"yellow"}); }
 function addCardRow(c){
 cardsBox.innerHTML+=`
 <div class="row">
-<select class="cteam"><option>home</option><option>away</option></select>
-<select class="ctype"><option>yellow</option><option>red</option></select>
-<input class="cplayer" placeholder="Player">
-<input class="cmin" type="number" placeholder="Min">
+<select class="cteam">
+<option ${c.team=="home"?"selected":""}>home</option>
+<option ${c.team=="away"?"selected":""}>away</option>
+</select>
+<select class="ctype">
+<option ${c.type=="yellow"?"selected":""}>yellow</option>
+<option ${c.type=="red"?"selected":""}>red</option>
+</select>
+<input class="cplayer" value="${c.player}">
+<input class="cmin" type="number" value="${c.minute}">
 </div>`;
 }
 
@@ -226,7 +244,7 @@ await updateDoc(ref,{matches:T.matches});
 closeAll();
 };
 
-window.del=async(i)=>{
+window.delMatch=async(i)=>{
 T.matches.splice(i,1);
 await updateDoc(ref,{matches:T.matches});
 };
@@ -240,4 +258,3 @@ e.classList.add("active");
 </script>
 </body>
   </html>
-
