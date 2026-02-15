@@ -156,6 +156,10 @@ tr:last-child td {
     border-bottom: none;
     background-color : #800020;
 }
+#table table th:nth-child(9),
+#table table td:nth-child(9) { 
+    background-color: #DA70D6 !important; 
+}
 /* Navbar */
 .navbar {
     position: fixed;
