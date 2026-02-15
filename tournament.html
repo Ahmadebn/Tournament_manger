@@ -5,257 +5,103 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tournament</title>
 <link rel="stylesheet" href="style.css">
+<style>
+.section{display:none}
+.section.active{display:block}
+.navbar{
+  position:fixed;bottom:0;left:0;right:0;
+  display:flex;justify-content:space-around;
+  background:#111;color:white;padding:10px;
+}
+.nav-item{cursor:pointer}
+.nav-item.active{font-weight:bold}
+table{width:100%;border-collapse:collapse}
+th,td{padding:6px;border:1px solid #ddd;text-align:center}
+.match-card{
+  display:flex;justify-content:space-between;
+  padding:8px;border:1px solid #ddd;margin:6px 0;
+}
+.modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.5);
+}
+.modal-content{
+  background:white;padding:20px;
+  width:300px;margin:100px auto;
+}
+</style>
 </head>
 
 <body>
+
 <div class="container">
 
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-  <button onclick="location.href='index.html'" style="background:var(--border);padding:8px 12px;">← Back</button>
-  <h1 id="title" style="margin:0;flex-grow:1;"></h1>
+<h1 id="title"></h1>
+
+<!-- ================= MATCHES ================= -->
+<div id="matchesSection" class="section active">
+
+<div style="display:flex;justify-content:space-between;">
+  <h2>Matches</h2>
+  <select id="roundFilter" onchange="renderMatches()"></select>
 </div>
 
-<div id="fixtures" class="section active">
-<h2>Fixtures</h2>
-<button class="add-match-btn" onclick="openAdd()">+ Add Match</button>
-<div id="fixturesList"></div>
+<button onclick="generateNextRound()">Generate Next Round</button>
+<button onclick="openAdd()">+ Add Match</button>
+
+<div id="matchesList"></div>
+
 </div>
 
-<div id="scores" class="section">
-<h2>Scores</h2>
-<div id="scoresList"></div>
-</div>
+<!-- ================= TABLE ================= -->
+<div id="tableSection" class="section">
 
-<div id="table" class="section">
-<h2>Standings</h2>
+<h2>League Table</h2>
+
 <table>
 <thead>
 <tr>
-<th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th>
-<th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
+<th>Team</th><th>P</th><th>W</th><th>D</th>
+<th>L</th><th>GF</th><th>GA</th>
+<th>GD</th><th>Pts</th>
 </tr>
 </thead>
 <tbody id="standings"></tbody>
 </table>
-</div>
 
 </div>
 
-<nav class="navbar">
-<div class="nav-item active" onclick="show('fixtures',this)">Fixtures</div>
-<div class="nav-item" onclick="show('scores',this)">Scores</div>
-<div class="nav-item" onclick="show('table',this)">Table</div>
-</nav>
+</div>
 
-<!-- ADD MATCH -->
+<!-- ================= NAVBAR ================= -->
+<div class="navbar">
+  <div class="nav-item active" onclick="showSection('matchesSection',this)">Matches</div>
+  <div class="nav-item" onclick="showSection('tableSection',this)">League Table</div>
+</div>
+
+<!-- ================= ADD MATCH ================= -->
 <div id="addModal" class="modal">
 <div class="modal-content">
 <h3>Add Match</h3>
-<input id="roundInput" type="number" value="1">
+<input id="roundInput" type="number" min="1">
 <select id="home"></select>
 <select id="away"></select>
+<br><br>
 <button onclick="closeAll()">Cancel</button>
 <button onclick="saveMatch()">Save</button>
 </div>
 </div>
 
-<!-- RESULT -->
+<!-- ================= RESULT ================= -->
 <div id="resultModal" class="modal">
 <div class="modal-content">
-<h3>Match Details</h3>
-
-<input id="sh" type="number" placeholder="Home goals">
-<input id="sa" type="number" placeholder="Away goals">
-
-<h4>Goals</h4>
-<div id="goalsBox"></div>
-<button onclick="addGoal()">+ Add Goal</button>
-
-<h4>Cards</h4>
-<div id="cardsBox"></div>
-<button onclick="addCard()">+ Add Card</button>
-
+<h3>Enter Result</h3>
+<input id="sh" type="number" min="0" placeholder="Home goals"><br><br>
+<input id="sa" type="number" min="0" placeholder="Away goals"><br><br>
 <button onclick="closeAll()">Cancel</button>
 <button onclick="saveResult()">Confirm</button>
 </div>
 </div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getFirestore,doc,onSnapshot,updateDoc,arrayUnion } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-
-/* YOUR CONFIG */
-const firebaseConfig={
-apiKey:"AIzaSyBYFoGEfyxSc_8h_GryQ4HXk9UDZf6I9Vc",
-authDomain:"football-manager-a8c11.firebaseapp.com",
-projectId:"football-manager-a8c11",
-storageBucket:"football-manager-a8c11.appspot.com",
-messagingSenderId:"78452499051",
-appId:"1:78452499051:web:5f26427727d1d17024c72e"
-};
-
-const app=initializeApp(firebaseConfig);
-const db=getFirestore(app);
-
-const id=new URLSearchParams(location.search).get("id");
-const ref=doc(db,"tournaments",id);
-
-let T=null;
-let currentIndex=null;
-
-onSnapshot(ref,s=>{
-T=s.data();
-if(!T.matches) T.matches=[];
-render();
-});
-
-function render(){
-title.innerText=T.name;
-
-home.innerHTML=""; away.innerHTML="";
-T.teams.forEach(t=>{
-home.innerHTML+=`<option>${t}</option>`;
-away.innerHTML+=`<option>${t}</option>`;
-});
-
-fixturesList.innerHTML="";
-scoresList.innerHTML="";
-
-const stats={};
-T.teams.forEach(t=>stats[t]={p:0,w:0,d:0,l:0,gf:0,ga:0});
-
-T.matches.forEach((m,i)=>{
-if(m.scoreHome==null){
-fixturesList.innerHTML+=`
-<div class="match-card">
-<span onclick="openResult(${i})">${m.home} vs ${m.away}</span>
-<button class="del" onclick="delMatch(${i})">X</button>
-</div>`;
-}else{
-scoresList.innerHTML+=`
-<div class="match-card">
-<span onclick="openResult(${i})">${m.home} ${m.scoreHome} - ${m.scoreAway} ${m.away}</span>
-</div>`;
-
-let h=stats[m.home], a=stats[m.away];
-h.p++;a.p++;
-h.gf+=m.scoreHome;h.ga+=m.scoreAway;
-a.gf+=m.scoreAway;a.ga+=m.scoreHome;
-if(m.scoreHome>m.scoreAway){h.w++;a.l++;}
-else if(m.scoreHome<m.scoreAway){a.w++;h.l++;}
-else{h.d++;a.d++;}
-}
-});
-
-const arr=Object.entries(stats).map(([k,v])=>{
-v.team=k;v.gd=v.gf-v.ga;v.pts=v.w*3+v.d;return v;
-}).sort((a,b)=>b.pts-a.pts||b.gd-a.gd);
-
-standings.innerHTML="";
-arr.forEach(t=>{
-standings.innerHTML+=`
-<tr>
-<td>${t.team}</td><td>${t.p}</td><td>${t.w}</td><td>${t.d}</td>
-<td>${t.l}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.gd}</td><td>${t.pts}</td>
-</tr>`;
-});
-}
-
-window.openAdd=()=>{addModal.style.display="block";}
-window.closeAll=()=>{addModal.style.display=resultModal.style.display="none";}
-
-window.saveMatch=async()=>{
-if(home.value===away.value) return alert("Same team!");
-await updateDoc(ref,{
-matches:arrayUnion({
-id:Date.now(),
-round:+roundInput.value,
-home:home.value,
-away:away.value,
-scoreHome:null,
-scoreAway:null,
-goals:[],
-cards:[]
-})
-});
-closeAll();
-};
-
-window.openResult=i=>{
-currentIndex=i;
-const m=T.matches[i];
-sh.value=m.scoreHome??"";
-sa.value=m.scoreAway??"";
-goalsBox.innerHTML="";
-cardsBox.innerHTML="";
-
-m.goals.forEach(g=>addGoalRow(g));
-m.cards.forEach(c=>addCardRow(c));
-resultModal.style.display="block";
-};
-
-/* FIXED RESTORE */
-function addGoal(){ addGoalRow({team:"home",player:"",minute:""}); }
-function addGoalRow(g){
-goalsBox.innerHTML+=`
-<div class="row">
-<select class="gteam">
-<option ${g.team=="home"?"selected":""}>home</option>
-<option ${g.team=="away"?"selected":""}>away</option>
-</select>
-<input class="gplayer" value="${g.player}">
-<input class="gmin" type="number" value="${g.minute}">
-</div>`;
-}
-
-function addCard(){ addCardRow({team:"home",player:"",minute:"",type:"yellow"}); }
-function addCardRow(c){
-cardsBox.innerHTML+=`
-<div class="row">
-<select class="cteam">
-<option ${c.team=="home"?"selected":""}>home</option>
-<option ${c.team=="away"?"selected":""}>away</option>
-</select>
-<select class="ctype">
-<option ${c.type=="yellow"?"selected":""}>yellow</option>
-<option ${c.type=="red"?"selected":""}>red</option>
-</select>
-<input class="cplayer" value="${c.player}">
-<input class="cmin" type="number" value="${c.minute}">
-</div>`;
-}
-
-window.saveResult=async()=>{
-const m=T.matches[currentIndex];
-m.scoreHome=+sh.value;
-m.scoreAway=+sa.value;
-m.goals=[...document.querySelectorAll("#goalsBox .row")].map(r=>({
-team:r.querySelector(".gteam").value,
-player:r.querySelector(".gplayer").value,
-minute:+r.querySelector(".gmin").value
-}));
-m.cards=[...document.querySelectorAll("#cardsBox .row")].map(r=>({
-team:r.querySelector(".cteam").value,
-type:r.querySelector(".ctype").value,
-player:r.querySelector(".cplayer").value,
-minute:+r.querySelector(".cmin").value
-}));
-await updateDoc(ref,{matches:T.matches});
-closeAll();
-};
-
-window.delMatch=async(i)=>{
-T.matches.splice(i,1);
-await updateDoc(ref,{matches:T.matches});
-};
-
-window.show=(id,e)=>{
-document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-document.getElementById(id).classList.add("active");
-document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
-e.classList.add("active");
-};
-</script>
+<script src="script.js"></script>
 </body>
   </html>
-
