@@ -154,11 +154,11 @@ td:first-child {
 
 tr:last-child td {
     border-bottom: none;
-    background-color : #800020;
+
 }
 #table table th:nth-child(9),
 #table table td:nth-child(9) { 
-    background-color: #DA70D6 !important; 
+    color: black !important; 
 }
 /* Navbar */
 .navbar {
@@ -234,4 +234,17 @@ tr:last-child td {
     background: var(--primary);
     color: white;
     float: right;
+    }
+.row {
+display:flex;
+gap:6px;
+margin-bottom:6px;
+}
+
+.row input, .row select {
+flex:1;
+padding:6px;
+border:1px solid var(--border);
+border-radius:6px;
+font-size:0.85rem;
     }
