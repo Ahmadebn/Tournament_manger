@@ -1,4 +1,7 @@
-
+if (!id) {
+  alert("Tournament ID missing in URL");
+  throw new Error("No tournament id");
+}
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
 import {
