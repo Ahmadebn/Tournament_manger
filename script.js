@@ -37,6 +37,15 @@ onSnapshot(tournamentRef,s=>{
   title.innerText=T.name;
   populateTeams();
 });
+window.openAdd = () => {
+  if (!T || !T.teams || T.teams.length < 2) {
+    alert("Not enough teams");
+    return;
+  }
+
+  roundInput.value = "";
+  addModal.style.display = "block";
+};
 
 onSnapshot(matchesRef,snap=>{
   matches=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -131,19 +140,68 @@ window.generateNextRound=async()=>{
   }
 };
 
-window.saveMatch=async()=>{
-  if(home.value===away.value) return alert("Same team");
+window.saveMatch = async () => {
 
-  await addDoc(matchesRef,{
-    round:+roundInput.value,
-    home:home.value,
-    away:away.value,
-    scoreHome:null,
-    scoreAway:null
+  const round = +roundInput.value;
+  if (!round || round < 1) {
+    alert("Invalid round number");
+    return;
+  }
+
+  if (home.value === away.value) {
+    alert("Same team not allowed");
+    return;
+  }
+
+  // منع تكرار نفس المباراة (نفس الاتجاه)
+  const exists = matches.some(m =>
+    m.home === home.value &&
+    m.away === away.value
+  );
+
+  if (exists) {
+    alert("This exact match already exists");
+    return;
+  }
+
+  // منع تكرار المباراة أكثر من مرتين (ذهاب وإياب)
+  const totalBetween = matches.filter(m =>
+    (m.home === home.value && m.away === away.value) ||
+    (m.home === away.value && m.away === home.value)
+  );
+
+  if (totalBetween.length >= 2) {
+    alert("Home & away already completed");
+    return;
+  }
+
+  // منع لعب نفس الفريق مرتين في نفس الجولة
+  const roundConflict = matches.some(m =>
+    m.round === round &&
+    (
+      m.home === home.value ||
+      m.away === home.value ||
+      m.home === away.value ||
+      m.away === away.value
+    )
+  );
+
+  if (roundConflict) {
+    alert("One of the teams already plays in this round");
+    return;
+  }
+
+  await addDoc(matchesRef, {
+    round: round,
+    home: home.value,
+    away: away.value,
+    scoreHome: null,
+    scoreAway: null
   });
 
   closeAll();
-};
+}; 
+
 
 window.deleteMatch=async(id)=>{
   if(!confirm("Delete match?")) return;
