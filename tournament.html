@@ -271,67 +271,24 @@ window.openAdd=()=> {
 
 window.closeAll=()=>{addModal.style.display=resultModal.style.display="none"}
 
-window.saveMatch = async () => {
-    if (home.value == away.value) {
-        alert("Same team!");
-        return;
-    }
+window.saveMatch=async()=>{
+if(home.value==away.value)return alert("Same team!");
 
-    const h = home.value;
-    const a = away.value;
-    const r = +roundInput.value;
+// Avoid repeating a match in the same round
+const exists = T.matches.some(m => m.round == roundInput.value && 
+    ((m.home == home.value && m.away == away.value) || (m.home == away.value && m.away == home.value)));
+if (exists) return alert("Match already exists in this round!");
 
-    // Find any previous meeting between these two teams
-    const previous = T.matches.find(m =>
-        (m.home === h && m.away === a) ||
-        (m.home === a && m.away === h)
-    );
-
-    // First leg (round < 20)
-    if (r < 20) {
-        if (previous) {
-            alert("These teams have already played. Replay only allowed in second leg.");
-            return;
-        }
-    }
-
-    // Second leg (round >= 20)
-    if (r >= 20) {
-        if (!previous) {
-            alert("Second leg not allowed. These teams never played in first leg.");
-            return;
-        }
-
-        // Must be reversed
-        if (previous.home === h && previous.away === a) {
-            alert("Second leg must swap home and away.");
-            return;
-        }
-
-        // Prevent third meeting
-        const alreadySecondLeg = T.matches.some(m =>
-            m.round >= 20 &&
-            ((m.home === h && m.away === a) ||
-             (m.home === a && m.away === h))
-        );
-
-        if (alreadySecondLeg) {
-            alert("These teams already played both legs.");
-            return;
-        }
-    }
-
-    await updateDoc(ref, {
-        matches: arrayUnion({
-            round: r,
-            home: h,
-            away: a,
-            scoreHome: null,
-            scoreAway: null
-        })
-    });
-
-    closeAll();
+await updateDoc(ref,{
+matches:arrayUnion({
+round:+roundInput.value,
+home:home.value,
+away:away.value,
+scoreHome:null,
+scoreAway:null
+})
+});
+closeAll();
 };
 
 window.del=async(i)=>{
@@ -365,4 +322,5 @@ closeAll();
 </body>
   </html>
   
+
 
